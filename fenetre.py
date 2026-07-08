@@ -162,7 +162,7 @@ class PingMonitorApp:
             fg=self.COLORS["text_muted"],
             bg=self.COLORS["surface_1"],
         )
-        label_machines.pack(anchor=tk.W, pady=(0, 6))
+        label_machines.pack(anchor=tk.W, pady=(0, 10))
 
         # Liste des machines (simulée)
         machines_data = [
@@ -172,33 +172,42 @@ class PingMonitorApp:
             ("PC Bureau 2", self.COLORS["fill_success"]),
         ]
 
+        # Conteneur Grid pour aligner parfaitement les lignes en vertical
+        list_container = tk.Frame(machines_frame, bg=self.COLORS["surface_1"])
+        list_container.pack(fill=tk.X)
+        list_container.columnconfigure(0, weight=0)  # Colonne du point (taille fixe)
+        list_container.columnconfigure(1, weight=1)  # Colonne du texte (prend la place)
+
         for i, (name, color) in enumerate(machines_data):
-            # Un petit canvas pour le rond de couleur
+            # Sélection visuelle du premier élément (Serveur Web)
+            is_selected = (i == 0)
+            row_bg = self.COLORS["surface_2"] if is_selected else self.COLORS["surface_1"]
+            
+            # Un frame par ligne pour gérer proprement l'arrière-plan de sélection et l'aération
+            row_frame = tk.Frame(list_container, bg=row_bg, padx=6, pady=6)
+            row_frame.grid(row=i, column=0, columnspan=2, sticky="ew", pady=4)
+            row_frame.columnconfigure(1, weight=1)
+
+            # Un petit canvas pour le rond de couleur (colonne 0)
             dot_canvas = tk.Canvas(
-                machines_frame,
+                row_frame,
                 width=10,
                 height=10,
-                bg=self.COLORS["surface_1"],
+                bg=row_bg,
                 highlightthickness=0,
             )
             dot_canvas.create_oval(0, 0, 10, 10, fill=color, outline="")
-            dot_canvas.pack(side=tk.LEFT, pady=(2, 2))
+            dot_canvas.grid(row=0, column=0, sticky="w", padx=(4, 8))
 
+            # Label du texte (colonne 1)
             label_machine = tk.Label(
-                machines_frame,
+                row_frame,
                 text=name,
                 font=self.font_small,
                 fg=self.COLORS["text_primary"],
-                bg=self.COLORS["surface_1"],
+                bg=row_bg,
             )
-            label_machine.pack(anchor=tk.W, pady=(2, 2), padx=(4, 0))
-
-            # Séparateur entre les éléments (sauf le dernier)
-            if i < len(machines_data) - 1:
-                sep_machine = tk.Frame(
-                    machines_frame, bg=self.COLORS["border"], height=1
-                )
-                sep_machine.pack(fill=tk.X, pady=2)
+            label_machine.grid(row=0, column=1, sticky="w")
 
         # Espace pour pousser l'intervalle en bas
         spacer = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"], height=10)
@@ -325,10 +334,8 @@ class PingMonitorApp:
             (560, 20),
             (600, 20),
         ]
-        # Adapté à la largeur du canvas
+        
         canvas_width = canvas.winfo_width() if canvas.winfo_width() > 100 else 600
-        # On redimensionne les points en fonction de la largeur réelle
-        # (on garde le ratio mais on scale)
         scale_x = canvas_width / 600 if canvas_width > 0 else 1
 
         # Convertir en coordonnées
@@ -345,7 +352,6 @@ class PingMonitorApp:
             smooth=False,
         )
 
-        # Forcer le canvas à se mettre à jour pour la largeur
         canvas.update_idletasks()
 
         # ----- LIGNE 3 : Journal des événements (tableau) -----
@@ -399,7 +405,6 @@ class PingMonitorApp:
             style="Custom.Treeview",
         )
 
-        # Définir les colonnes
         tree.heading("Heure", text="Heure")
         tree.heading("Machine", text="Machine")
         tree.heading("Evenement", text="Événement")
@@ -416,17 +421,14 @@ class PingMonitorApp:
         ]
 
         for event in events:
-            # Couleur du texte selon l'événement
             color = self.COLORS["text_danger"] if "Hors ligne" in event[2] else self.COLORS["text_success"]
             tree.insert("", tk.END, values=event, tags=(color,))
 
-        # Configurer les tags pour les couleurs
         tree.tag_configure(self.COLORS["text_danger"], foreground=self.COLORS["text_danger"])
         tree.tag_configure(self.COLORS["text_success"], foreground=self.COLORS["text_success"])
 
         tree.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
 
-        # Ajouter une fine ligne de séparation en bas du tableau
         sep_log = tk.Frame(inner_log, bg=self.COLORS["border"], height=1)
         sep_log.pack(fill=tk.X, pady=(6, 0))
 
