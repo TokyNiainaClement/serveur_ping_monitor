@@ -62,15 +62,20 @@ class DashboardController:
             for id_m, nom, ip in machines:
                 en_ligne = ping(ip)
                 statut = "En ligne" if en_ligne else "Hors ligne"
-                self.derniers_statuts[ip] = en_ligne
                 heure = time.strftime("%H:%M:%S")
 
-                # Écriture en base (thread de ping, aucun widget touché ici)
-                self.db.add_evenement(ip, nom, statut)
+                statut_precedent = self.derniers_statuts.get(ip)  # None si jamais vu
+                changement = statut_precedent is None or statut_precedent != en_ligne
 
-                # ⚠️ Mise à jour de l'UI toujours via after() sur le thread principal
-                self.view.root.after(0, self._mettre_a_jour_vue, heure, nom, statut)
-            
+                self.derniers_statuts[ip] = (
+                    en_ligne  # on met à jour la mémoire dans tous les cas
+                )
+
+                if changement:
+                    # On ne journalise en BDD et dans l'UI QUE si le statut a changé
+                    self.db.add_evenement(ip, nom, statut)
+                    self.view.root.after(0, self._mettre_a_jour_vue, heure, nom, statut)
+
             # Calcul des statistiques après un cycle complet de ping
             disponibilite, pannes = self.db.get_stats_globales()
             machines_en_ligne = sum(1 for v in self.derniers_statuts.values() if v)
