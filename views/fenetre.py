@@ -73,6 +73,23 @@ class PingMonitorDarkApp:
         )
         title_label.pack(side=tk.LEFT, padx=16, pady=10)
 
+        # Bouton quitter l'application
+        btn_quit = tk.Button(
+            header,
+            text="Quitter",
+            font=self.font_small,
+            bg=self.COLORS["surface_2"],
+            fg=self.COLORS["text_primary"],
+            relief="flat",
+            bd=1,
+            highlightthickness=0,
+            cursor="hand2",
+            activebackground=self.COLORS["border"],
+            activeforeground=self.COLORS["text_primary"],
+            command=self.root.quit
+        )
+        btn_quit.pack(side=tk.LEFT, padx=16, pady=10)
+
         # Séparateur
         separator = tk.Frame(main_frame, bg=self.COLORS["border"], height=1)
         separator.pack(fill=tk.X, side=tk.TOP)
