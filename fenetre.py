@@ -4,35 +4,35 @@ from tkinter import ttk, font
 class PingMonitorDarkApp:
     """
     Ping Monitor — Tableau de bord (Mode Sombre)
-    Interface de bureau moderne pour la surveillance des machines
-    Adaptée en thème sombre à partir de la maquette HTML/CSS
+    Interface de bureau moderne avec tableau parfaitement aligné
+    et lignes de séparation horizontales
     """
 
     # Palette de couleurs (Dark Theme)
     COLORS = {
-        "surface_1": "#1A1A18",  # Fond principal (gris anthracite)
-        "surface_2": "#242422",  # Cartes et en-tête (élévation)
-        "border": "#33322F",  # Bordures fines
-        "text_primary": "#F1EFE8",  # Blanc cassé
-        "text_secondary": "#B4B2A9",  # Gris clair
-        "text_muted": "#706F6A",  # Gris moyen
-        "text_success": "#1D9E75",  # Vert succès
-        "text_danger": "#E24B4A",  # Rouge danger
-        "accent": "#3A86C8",  # Bleu accentué
-        "body_bg": "#0F0F0E",  # Fond de l'application
+        "body_bg": "#0F0F0E",           # Fond de l'application
+        "surface_1": "#1A1A18",          # Conteneur principal
+        "surface_2": "#242422",          # Cartes, en-tête, tableau
+        "border": "#33322F",             # Bordures et séparateurs
+        "text_primary": "#F1EFE8",       # Texte principal
+        "text_secondary": "#B4B2A9",     # Texte secondaire
+        "text_muted": "#706F6A",         # Texte atténué
+        "text_success": "#1D9E75",       # Succès / En ligne
+        "text_danger": "#E24B4A",        # Danger / Hors ligne
     }
 
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Ping Monitor")
-        self.root.geometry("1000x620")
+        self.root.geometry("1100x680")
         self.root.configure(bg=self.COLORS["body_bg"])
         self.root.resizable(True, True)
 
         # Polices
-        self.font_small = font.Font(family="Segoe UI", size=9)
-        self.font_medium = font.Font(family="Segoe UI", size=10)
-        self.font_large = font.Font(family="Segoe UI", size=12, weight="bold")
+        self.font_small = ("Segoe UI", 9)
+        self.font_medium = ("Segoe UI", 10)
+        self.font_large = ("Segoe UI", 12, "bold")
+        self.font_xlarge = ("Segoe UI", 20, "bold")
 
         self._build_ui()
         self.root.mainloop()
@@ -49,19 +49,18 @@ class PingMonitorDarkApp:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # ------ EN-TÊTE ------
-        header = tk.Frame(main_frame, bg=self.COLORS["surface_2"], height=46)
+        header = tk.Frame(main_frame, bg=self.COLORS["surface_2"], height=48)
         header.pack(fill=tk.X, side=tk.TOP, pady=(0, 0))
         header.pack_propagate(False)
 
-        # Titre avec icône
         title_label = tk.Label(
             header,
-            text="❤️ Ping Monitor — Tableau de bord",
+            text=" Ping Monitor — Tableau de bord",
             font=self.font_medium,
             fg=self.COLORS["text_primary"],
             bg=self.COLORS["surface_2"],
         )
-        title_label.pack(side=tk.LEFT, padx=14, pady=10)
+        title_label.pack(side=tk.LEFT, padx=16, pady=10)
 
         # Séparateur
         separator = tk.Frame(main_frame, bg=self.COLORS["border"], height=1)
@@ -73,7 +72,7 @@ class PingMonitorDarkApp:
 
         # Sidebar gauche
         self.sidebar = tk.Frame(
-            body, bg=self.COLORS["surface_1"], width=220, relief="flat"
+            body, bg=self.COLORS["surface_1"], width=230, relief="flat"
         )
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 0), pady=(0, 0))
         self.sidebar.pack_propagate(False)
@@ -112,7 +111,7 @@ class PingMonitorDarkApp:
             relief="flat",
             bd=1,
             highlightthickness=0,
-            insertbackground=self.COLORS["text_primary"],  # Curseur clair
+            insertbackground=self.COLORS["text_primary"],
         )
         self.entry_ip.pack(fill=tk.X, pady=(4, 4))
         self.entry_ip.insert(0, "192.168.1.10")
@@ -165,40 +164,45 @@ class PingMonitorDarkApp:
         )
         label_machines.pack(anchor=tk.W, pady=(0, 6))
 
-        # Liste des machines (simulée)
+        # Liste des machines
         machines_data = [
-            ("Serveur Web", self.COLORS["text_success"]),
-            ("Routeur", self.COLORS["text_success"]),
-            ("Imprimante", self.COLORS["text_danger"]),
-            ("PC Bureau 2", self.COLORS["text_success"]),
+            ("Serveur Web", self.COLORS["text_success"], True),
+            ("Routeur", self.COLORS["text_success"], False),
+            ("Imprimante", self.COLORS["text_danger"], False),
+            ("PC Bureau 2", self.COLORS["text_success"], False),
         ]
 
-        for i, (name, color) in enumerate(machines_data):
-            # Rond de couleur (Canvas)
-            dot_canvas = tk.Canvas(
+        for i, (name, color, selected) in enumerate(machines_data):
+            # Conteneur de ligne
+            line_bg = self.COLORS["surface_2"] if selected else self.COLORS["surface_1"]
+            line_frame = tk.Frame(
                 machines_frame,
+                bg=line_bg,
+                relief="flat",
+                bd=0,
+            )
+            line_frame.pack(fill=tk.X, pady=(1, 1))
+
+            # Puce colorée (Canvas pour un cercle parfait)
+            dot_canvas = tk.Canvas(
+                line_frame,
                 width=10,
                 height=10,
-                bg=self.COLORS["surface_1"],
+                bg=line_bg,
                 highlightthickness=0,
             )
             dot_canvas.create_oval(0, 0, 10, 10, fill=color, outline="")
-            dot_canvas.pack(side=tk.LEFT, pady=(2, 2))
+            dot_canvas.pack(side=tk.LEFT, padx=(8, 4), pady=6)
 
+            # Nom de la machine
             label_machine = tk.Label(
-                machines_frame,
+                line_frame,
                 text=name,
                 font=self.font_small,
                 fg=self.COLORS["text_primary"],
-                bg=self.COLORS["surface_1"],
+                bg=line_bg,
             )
-            label_machine.pack(anchor=tk.W, pady=(2, 2), padx=(4, 0))
-
-            if i < len(machines_data) - 1:
-                sep_machine = tk.Frame(
-                    machines_frame, bg=self.COLORS["border"], height=1
-                )
-                sep_machine.pack(fill=tk.X, pady=2)
+            label_machine.pack(anchor=tk.W, pady=6, padx=(0, 8))
 
         # Espace pour pousser l'intervalle en bas
         spacer = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"], height=10)
@@ -227,7 +231,7 @@ class PingMonitorDarkApp:
         interval_label.pack(anchor=tk.W)
 
     def _build_content(self):
-        """Construit la zone de contenu principale en mode sombre."""
+        """Construit la zone de contenu principale avec tableau parfaitement aligné."""
         content_pad = tk.Frame(
             self.content, bg=self.COLORS["surface_1"]
         )
@@ -270,7 +274,7 @@ class PingMonitorDarkApp:
             label_value = tk.Label(
                 inner,
                 text=value,
-                font=self.font_large,
+                font=self.font_xlarge,
                 fg=color,
                 bg=self.COLORS["surface_2"],
             )
@@ -294,7 +298,7 @@ class PingMonitorDarkApp:
         )
         label_chart.pack(anchor=tk.W, pady=(0, 6))
 
-        # Canvas pour le graphique (fond sombre)
+        # Canvas pour le graphique
         canvas = tk.Canvas(
             inner_chart,
             height=70,
@@ -303,25 +307,14 @@ class PingMonitorDarkApp:
         )
         canvas.pack(fill=tk.X, pady=(0, 0))
 
-        # Données du graphique (identique au SVG)
+        # Données du graphique
         points = [
-            (0, 40),
-            (40, 40),
-            (80, 20),
-            (120, 20),
-            (160, 20),
-            (200, 60),
-            (240, 60),
-            (280, 20),
-            (320, 20),
-            (360, 20),
-            (400, 20),
-            (440, 20),
-            (480, 45),
-            (520, 20),
-            (560, 20),
-            (600, 20),
+            (0, 40), (40, 40), (80, 20), (120, 20), (160, 20),
+            (200, 60), (240, 60), (280, 20), (320, 20), (360, 20),
+            (400, 20), (440, 20), (480, 45), (520, 20), (560, 20), (600, 20),
         ]
+        
+        canvas.update_idletasks()
         canvas_width = canvas.winfo_width() if canvas.winfo_width() > 100 else 600
         scale_x = canvas_width / 600 if canvas_width > 0 else 1
 
@@ -330,16 +323,14 @@ class PingMonitorDarkApp:
             coords.append(x * scale_x)
             coords.append(y)
 
-        # Ligne verte (succès)
         canvas.create_line(
             coords,
             fill=self.COLORS["text_success"],
             width=2,
             smooth=False,
         )
-        canvas.update_idletasks()
 
-        # ----- LIGNE 3 : Journal des événements (tableau) -----
+        # ----- LIGNE 3 : Journal des événements (Tableau avec Grid et séparateurs) -----
         log_frame = tk.Frame(
             content_pad, bg=self.COLORS["surface_2"], relief="flat", bd=0
         )
@@ -355,68 +346,83 @@ class PingMonitorDarkApp:
             fg=self.COLORS["text_primary"],
             bg=self.COLORS["surface_2"],
         )
-        label_log.pack(anchor=tk.W, pady=(0, 6))
+        label_log.pack(anchor=tk.W, pady=(0, 8))
 
-        # Tableau avec ttk.Treeview (stylisé dark)
-        style = ttk.Style()
-        style.theme_use("default")
-        style.configure(
-            "Dark.Treeview",
-            background=self.COLORS["surface_2"],
-            foreground=self.COLORS["text_primary"],
-            fieldbackground=self.COLORS["surface_2"],
-            borderwidth=0,
-            relief="flat",
-            font=("Segoe UI", 9),
+        # ----- TABLEAU AVEC GRID ET SÉPARATEURS -----
+        table_container = tk.Frame(inner_log, bg=self.COLORS["surface_2"])
+        table_container.pack(fill=tk.BOTH, expand=True)
+
+        # Configuration de la grille avec des poids égaux
+        table_container.grid_columnconfigure(0, weight=1, uniform="col")
+        table_container.grid_columnconfigure(1, weight=1, uniform="col")
+        table_container.grid_columnconfigure(2, weight=1, uniform="col")
+
+        # ----- EN-TÊTES -----
+        headers = ["Heure", "Machine", "Événement"]
+        for col, header in enumerate(headers):
+            label = tk.Label(
+                table_container,
+                text=header,
+                font=self.font_small,
+                fg=self.COLORS["text_muted"],
+                bg=self.COLORS["surface_2"],
+                anchor="w",
+            )
+            label.grid(row=0, column=col, sticky="w", padx=(2, 0), pady=(0, 4))
+
+        # Séparateur sous l'en-tête
+        sep_header = tk.Frame(
+            table_container,
+            bg=self.COLORS["border"],
+            height=1,
         )
-        style.configure(
-            "Dark.Treeview.Heading",
-            background=self.COLORS["surface_2"],
-            foreground=self.COLORS["text_muted"],
-            relief="flat",
-            borderwidth=0,
-            font=("Segoe UI", 9),
-        )
-        style.map(
-            "Dark.Treeview",
-            background=[("selected", "#33322F")],
-        )
+        sep_header.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 6))
 
-        tree = ttk.Treeview(
-            inner_log,
-            columns=("Heure", "Machine", "Evenement"),
-            show="headings",
-            height=3,
-            style="Dark.Treeview",
-        )
-
-        tree.heading("Heure", text="Heure")
-        tree.heading("Machine", text="Machine")
-        tree.heading("Evenement", text="Événement")
-
-        tree.column("Heure", width=120, anchor="w")
-        tree.column("Machine", width=120, anchor="w")
-        tree.column("Evenement", width=200, anchor="w")
-
-        # Données avec couleurs conditionnelles
+        # ----- DONNÉES DU TABLEAU AVEC SÉPARATEURS -----
         events = [
             ("14:32:10", "Imprimante", "Hors ligne"),
             ("13:58:44", "Serveur Web", "En ligne"),
             ("13:20:02", "Serveur Web", "Hors ligne"),
         ]
 
-        for event in events:
-            color = self.COLORS["text_danger"] if "Hors ligne" in event[2] else self.COLORS["text_success"]
-            tree.insert("", tk.END, values=event, tags=(color,))
+        # On commence à la ligne 2 (row=2)
+        current_row = 2
+        
+        for i, event in enumerate(events):
+            # Déterminer la couleur de l'événement
+            event_color = self.COLORS["text_danger"] if "Hors ligne" in event[2] else self.COLORS["text_success"]
+            
+            # Afficher les données
+            for col, value in enumerate(event):
+                # Déterminer la couleur pour chaque colonne
+                if col == 0:  # Heure
+                    color = self.COLORS["text_secondary"]
+                elif col == 1:  # Machine
+                    color = self.COLORS["text_primary"]
+                else:  # Événement
+                    color = event_color
+                
+                label = tk.Label(
+                    table_container,
+                    text=value,
+                    font=self.font_small,
+                    fg=color,
+                    bg=self.COLORS["surface_2"],
+                    anchor="w",
+                )
+                label.grid(row=current_row, column=col, sticky="w", padx=(2, 0), pady=(2, 2))
 
-        tree.tag_configure(self.COLORS["text_danger"], foreground=self.COLORS["text_danger"])
-        tree.tag_configure(self.COLORS["text_success"], foreground=self.COLORS["text_success"])
-
-        tree.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
-
-        # Séparateur en bas du tableau
-        sep_log = tk.Frame(inner_log, bg=self.COLORS["border"], height=1)
-        sep_log.pack(fill=tk.X, pady=(6, 0))
+            # Ajouter une ligne de séparation horizontale SAUF après la dernière ligne
+            if i < len(events) - 1:
+                sep_line = tk.Frame(
+                    table_container,
+                    bg=self.COLORS["border"],
+                    height=1,
+                )
+                sep_line.grid(row=current_row + 1, column=0, columnspan=3, sticky="ew", pady=(4, 4))
+                current_row += 2
+            else:
+                current_row += 1
 
 
 if __name__ == "__main__":
