@@ -38,6 +38,19 @@ class Database:
         self.cursor.execute("SELECT id, nom, ip FROM machines")
         return self.cursor.fetchall()
 
+    def add_machine(self, nom, ip):
+        """Insère une nouvelle machine. Retourne True si succès, False si l'IP existe déjà."""
+        try:
+            self.cursor.execute(
+                "INSERT INTO machines (nom, ip) VALUES (?, ?)",
+                (nom, ip),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            # L'IP existe déjà (contrainte UNIQUE)
+            return False
+
     def add_evenement(self, ip, nom, evenement):
         heure = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.cursor.execute(
@@ -52,6 +65,19 @@ class Database:
             (limit,),
         )
         return self.cursor.fetchall()
+    
+    def get_stats_globales(self):
+        """Calcule la disponibilité (%) et le nombre de pannes sur tout l'historique."""
+        self.cursor.execute("SELECT COUNT(*) FROM evenements WHERE evenement = 'En ligne'")
+        en_ligne = self.cursor.fetchone()[0]
+
+        self.cursor.execute("SELECT COUNT(*) FROM evenements WHERE evenement = 'Hors ligne'")
+        pannes = self.cursor.fetchone()[0]
+
+        total = en_ligne + pannes
+        disponibilite = (en_ligne / total * 100) if total > 0 else 0
+        return disponibilite, pannes
+    
 
     def close(self):
         self.conn.close()

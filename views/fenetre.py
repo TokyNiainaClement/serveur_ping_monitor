@@ -22,8 +22,10 @@ class PingMonitorDarkApp:
         "text_danger": "#E24B4A",  # Danger / Hors ligne
     }
 
-    def __init__(self):
+    def __init__(self, on_ajouter=None, on_actualiser=None):
         self.root = tk.Tk()
+        self.on_ajouter = on_ajouter
+        self.on_actualiser = on_actualiser
         self.root.title("Ping Monitor")
         self.root.geometry("1100x680")
         self.root.configure(bg=self.COLORS["body_bg"])
@@ -112,33 +114,54 @@ class PingMonitorDarkApp:
         label_add.pack(anchor=tk.W)
 
         # Champ IP
+        self.placeholder_ip = "192.168.1.10"
         self.entry_ip = tk.Entry(
             add_frame,
             font=self.font_small,
             bg=self.COLORS["surface_2"],
-            fg=self.COLORS["text_primary"],
+            fg=self.COLORS["text_muted"],
             relief="flat",
             bd=1,
             highlightthickness=0,
             insertbackground=self.COLORS["text_primary"],
         )
         self.entry_ip.pack(fill=tk.X, pady=(4, 4))
-        self.entry_ip.insert(0, "192.168.1.10")
+        self.entry_ip.insert(0, self.placeholder_ip)
+        self.entry_ip.bind(
+            "<FocusIn>",
+            lambda e: self._effacer_placeholder(self.entry_ip, self.placeholder_ip),
+        )
+        self.entry_ip.bind(
+            "<FocusOut>",
+            lambda e: self._restaurer_placeholder(self.entry_ip, self.placeholder_ip),
+        )
         self.entry_ip.config(fg=self.COLORS["text_secondary"])
 
         # Champ nom
+        self.placeholder_nom = "Nom (optionnel)"
         self.entry_name = tk.Entry(
             add_frame,
             font=self.font_small,
             bg=self.COLORS["surface_2"],
-            fg=self.COLORS["text_secondary"],
+            fg=self.COLORS["text_muted"],
             relief="flat",
             bd=1,
             highlightthickness=0,
             insertbackground=self.COLORS["text_primary"],
         )
         self.entry_name.pack(fill=tk.X, pady=(0, 6))
-        self.entry_name.insert(0, "Nom (optionnel)")
+        self.entry_name.insert(0, self.placeholder_nom)
+        self.entry_name.bind(
+            "<FocusIn>",
+            lambda e: self._effacer_placeholder(self.entry_name, self.placeholder_nom),
+        )
+        self.entry_name.bind(
+            "<FocusOut>",
+            lambda e: self._restaurer_placeholder(
+                self.entry_name, self.placeholder_nom
+            ),
+        )
+        # self.entry_name.insert(0, "Nom (optionnel)")
 
         # Bouton Ajouter
         btn_add = tk.Button(
@@ -153,6 +176,7 @@ class PingMonitorDarkApp:
             cursor="hand2",
             activebackground=self.COLORS["border"],
             activeforeground=self.COLORS["text_primary"],
+            command=self._on_clic_ajouter,  # <-- ligne ajoutée
         )
         btn_add.pack(fill=tk.X, pady=(0, 0))
 
@@ -161,57 +185,44 @@ class PingMonitorDarkApp:
         sep.pack(fill=tk.X, padx=14, pady=8)
 
         # Section "Machines surveillées"
+        # Section "Machines surveillées"
         machines_frame = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"])
         machines_frame.pack(fill=tk.X, padx=14, pady=(0, 0))
 
+        header_machines = tk.Frame(machines_frame, bg=self.COLORS["surface_1"])
+        header_machines.pack(fill=tk.X, pady=(0, 6))
+
         label_machines = tk.Label(
-            machines_frame,
+            header_machines,
             text="Machines surveillées",
             font=self.font_small,
             fg=self.COLORS["text_muted"],
             bg=self.COLORS["surface_1"],
         )
-        label_machines.pack(anchor=tk.W, pady=(0, 6))
+        label_machines.pack(side=tk.LEFT, anchor=tk.W)
 
-        # Liste des machines
-        machines_data = [
-            ("Serveur Web", self.COLORS["text_success"], True),
-            ("Routeur", self.COLORS["text_success"], False),
-            ("Imprimante", self.COLORS["text_danger"], False),
-            ("PC Bureau 2", self.COLORS["text_success"], False),
-        ]
+        btn_refresh = tk.Button(
+            header_machines,
+            text="🔄",
+            font=self.font_small,
+            bg=self.COLORS["surface_1"],
+            fg=self.COLORS["text_muted"],
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            activeforeground=self.COLORS["text_primary"],
+            command=self._on_clic_actualiser,
+        )
+        btn_refresh.pack(side=tk.RIGHT)
 
-        for i, (name, color, selected) in enumerate(machines_data):
-            # Conteneur de ligne
-            line_bg = self.COLORS["surface_2"] if selected else self.COLORS["surface_1"]
-            line_frame = tk.Frame(
-                machines_frame,
-                bg=line_bg,
-                relief="flat",
-                bd=0,
-            )
-            line_frame.pack(fill=tk.X, pady=(1, 1))
+        # Conteneur redessiné à chaque actualisation
+        self.liste_machines_container = tk.Frame(
+            machines_frame, bg=self.COLORS["surface_1"]
+        )
+        self.liste_machines_container.pack(fill=tk.X)
 
-            # Puce colorée (Canvas pour un cercle parfait)
-            dot_canvas = tk.Canvas(
-                line_frame,
-                width=10,
-                height=10,
-                bg=line_bg,
-                highlightthickness=0,
-            )
-            dot_canvas.create_oval(0, 0, 10, 10, fill=color, outline="")
-            dot_canvas.pack(side=tk.LEFT, padx=(8, 4), pady=6)
-
-            # Nom de la machine
-            label_machine = tk.Label(
-                line_frame,
-                text=name,
-                font=self.font_small,
-                fg=self.COLORS["text_primary"],
-                bg=line_bg,
-            )
-            label_machine.pack(anchor=tk.W, pady=6, padx=(0, 8))
+        self._dessiner_machines([])  # vide au démarrage
 
         # Espace pour pousser l'intervalle en bas
         spacer = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"], height=10)
@@ -243,11 +254,13 @@ class PingMonitorDarkApp:
         indicators_frame.pack(fill=tk.X, pady=(0, 14))
 
         indicators = [
-            ("Disponibilité globale", "92%", self.COLORS["text_primary"]),
-            ("Machines en ligne", "3 / 4", self.COLORS["text_success"]),
-            ("Pannes détectées", "7", self.COLORS["text_primary"]),
-            ("Dernier scan", "il y a 4s", self.COLORS["text_primary"]),
+            ("Disponibilité globale", "—", self.COLORS["text_primary"]),
+            ("Machines en ligne", "0 / 0", self.COLORS["text_success"]),
+            ("Pannes détectées", "0", self.COLORS["text_primary"]),
+            ("Dernier scan", "—", self.COLORS["text_primary"]),
         ]
+
+        self.indicator_labels = {}   # <-- ligne ajoutée : pour retrouver chaque label ensuite
 
         for i, (title, value, color) in enumerate(indicators):
             card = tk.Frame(
@@ -280,6 +293,7 @@ class PingMonitorDarkApp:
                 bg=self.COLORS["surface_2"],
             )
             label_value.pack(anchor=tk.W)
+            self.indicator_labels[title] = label_value   # <-- garde une référence pour mise à jour
 
         # ----- LIGNE 2 : Graphique -----
         chart_frame = tk.Frame(
@@ -449,6 +463,91 @@ class PingMonitorDarkApp:
     # ------------------------------------------------------------------
     # MÉTHODE PUBLIQUE : appelée par le contrôleur pour ajouter une ligne
     # ------------------------------------------------------------------
+
+    def _effacer_placeholder(self, entry, placeholder):
+        """Vide le champ et repasse en couleur normale s'il contient encore le placeholder."""
+        if entry.get() == placeholder:
+            entry.delete(0, tk.END)
+            entry.config(fg=self.COLORS["text_primary"])
+
+    def _restaurer_placeholder(self, entry, placeholder):
+        """Remet le placeholder si l'utilisateur a laissé le champ vide."""
+        if entry.get().strip() == "":
+            entry.insert(0, placeholder)
+            entry.config(fg=self.COLORS["text_muted"])
+
+    def _dessiner_machines(self, machines):
+        """machines : liste de tuples (nom, en_ligne) — en_ligne = True/False/None."""
+        for widget in self.liste_machines_container.winfo_children():
+            widget.destroy()
+
+        for nom, en_ligne in machines:
+            if en_ligne is True:
+                color = self.COLORS["text_success"]
+            elif en_ligne is False:
+                color = self.COLORS["text_danger"]
+            else:
+                color = self.COLORS["text_muted"]
+
+            line_frame = tk.Frame(
+                self.liste_machines_container, bg=self.COLORS["surface_1"]
+            )
+            line_frame.pack(fill=tk.X, pady=(1, 1))
+
+            dot_canvas = tk.Canvas(
+                line_frame,
+                width=10,
+                height=10,
+                bg=self.COLORS["surface_1"],
+                highlightthickness=0,
+            )
+            dot_canvas.create_oval(0, 0, 10, 10, fill=color, outline="")
+            dot_canvas.pack(side=tk.LEFT, padx=(8, 4), pady=6)
+
+            label_machine = tk.Label(
+                line_frame,
+                text=nom,
+                font=self.font_small,
+                fg=self.COLORS["text_primary"],
+                bg=self.COLORS["surface_1"],
+            )
+            label_machine.pack(anchor=tk.W, pady=6, padx=(0, 8))
+
+    def actualiser_machines(self, machines):
+        """Méthode publique appelée par le contrôleur pour rafraîchir la sidebar."""
+        self._dessiner_machines(machines)
+
+    def _on_clic_actualiser(self):
+        if self.on_actualiser:
+            self.on_actualiser()
+
+    def _on_clic_ajouter(self):
+        """Lit les champs IP/Nom et transmet au contrôleur via le callback."""
+        ip = self.entry_ip.get().strip()
+        nom = self.entry_name.get().strip()
+
+        # Ignore le texte de placeholder si l'utilisateur n'a rien tapé
+        if ip == "192.168.1.10" or ip == "":
+            return
+        if nom == "Nom (optionnel)" or nom == "":
+            nom = ip  # nom par défaut = IP
+
+        if self.on_ajouter:
+            self.on_ajouter(ip, nom)
+
+        # Réinitialise les champs après l'ajout
+        self.entry_ip.delete(0, tk.END)
+        self.entry_name.delete(0, tk.END)
+        self.entry_name.insert(0, "Nom (optionnel)")
+
+    
+    def mettre_a_jour_indicateurs(self, disponibilite, machines_en_ligne, total_machines, pannes, dernier_scan):
+        """Appelée par le contrôleur (thread principal) pour rafraîchir les 4 cartes du haut."""
+        self.indicator_labels["Disponibilité globale"].config(text=f"{disponibilite:.0f}%")
+        self.indicator_labels["Machines en ligne"].config(text=f"{machines_en_ligne} / {total_machines}")
+        self.indicator_labels["Pannes détectées"].config(text=str(pannes))
+        self.indicator_labels["Dernier scan"].config(text=dernier_scan)
+        
 
     def ajouter_evenement(self, heure, machine, evenement):
         """

@@ -16,10 +16,15 @@ class DashboardController:
     def __init__(self):
         self.db = Database()
         self.intervalle = 5  # secondes entre chaque cycle de ping
+        self.derniers_statuts = {}
 
         # 1. On construit la fenêtre (ne bloque plus, grâce à run() séparé)
-        self.view = PingMonitorDarkApp()
+        self.view = PingMonitorDarkApp(
+            on_ajouter=self.ajouter_machine,
+            on_actualiser=self.actualiser_machines,
+        )
 
+        self.actualiser_machines()  # <-- première génération de la liste
         # 2. self.view existe déjà : le thread peut l'utiliser en sécurité
         self._start_ping_thread()
 
@@ -33,6 +38,22 @@ class DashboardController:
     # PARTIE PING (lit les machines depuis la BDD)
     # ------------------------------------------------------------------
 
+    def actualiser_machines(self):
+        """Relit la BDD et redessine la sidebar (thread principal uniquement)."""
+        machines = self.db.get_machines()  # [(id, nom, ip), ...]
+        liste = [(nom, self.derniers_statuts.get(ip)) for id_m, nom, ip in machines]
+        self.view.actualiser_machines(liste)
+
+    def ajouter_machine(self, ip, nom):
+        """Appelée depuis la vue (thread principal) quand on clique sur 'Ajouter'."""
+        succes = self.db.add_machine(nom, ip)
+        heure = time.strftime("%H:%M:%S")
+        if succes:
+            self.view.ajouter_evenement(heure, nom, "Machine ajoutée")
+            self.actualiser_machines()
+        else:
+            self.view.ajouter_evenement(heure, nom, "Erreur : IP déjà existante")
+
     def _boucle_ping(self):
         """Boucle infinie : ping toutes les machines de la BDD, toutes les X secondes."""
         while True:
@@ -41,6 +62,7 @@ class DashboardController:
             for id_m, nom, ip in machines:
                 en_ligne = ping(ip)
                 statut = "En ligne" if en_ligne else "Hors ligne"
+                self.derniers_statuts[ip] = en_ligne
                 heure = time.strftime("%H:%M:%S")
 
                 # Écriture en base (thread de ping, aucun widget touché ici)
@@ -48,6 +70,22 @@ class DashboardController:
 
                 # ⚠️ Mise à jour de l'UI toujours via after() sur le thread principal
                 self.view.root.after(0, self._mettre_a_jour_vue, heure, nom, statut)
+            
+            # Calcul des statistiques après un cycle complet de ping
+            disponibilite, pannes = self.db.get_stats_globales()
+            machines_en_ligne = sum(1 for v in self.derniers_statuts.values() if v)
+            total_machines = len(machines)
+            dernier_scan = time.strftime("%H:%M:%S")
+
+            self.view.root.after(
+                0,
+                self.view.mettre_a_jour_indicateurs,
+                disponibilite,
+                machines_en_ligne,
+                total_machines,
+                pannes,
+                dernier_scan,
+            )
 
             time.sleep(self.intervalle)
 
