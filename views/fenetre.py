@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, font
+import time
 
 
 class PingMonitorDarkApp:
@@ -46,6 +47,7 @@ class PingMonitorDarkApp:
         Séparée de __init__ pour que le contrôleur puisse récupérer
         l'instance (self.view) AVANT que la fenêtre ne bloque le programme.
         """
+        self._tick_dernier_scan()  # démarre le compteur en direct
         self.root.mainloop()
 
     def _build_ui(self):
@@ -220,7 +222,7 @@ class PingMonitorDarkApp:
         # Section "Machines surveillées"
         # Section "Machines surveillées"
         machines_frame = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"])
-        machines_frame.pack(fill=tk.X, padx=14, pady=(0, 0))
+        machines_frame.pack(fill=tk.BOTH, expand=True, padx=14, pady=(0, 0))
 
         header_machines = tk.Frame(machines_frame, bg=self.COLORS["surface_1"])
         header_machines.pack(fill=tk.X, pady=(0, 6))
@@ -249,17 +251,61 @@ class PingMonitorDarkApp:
         )
         btn_refresh.pack(side=tk.RIGHT)
 
-        # Conteneur redessiné à chaque actualisation
-        self.liste_machines_container = tk.Frame(
-            machines_frame, bg=self.COLORS["surface_1"]
+        # Zone scrollable pour la liste des machines
+        self.machines_canvas = tk.Canvas(
+            machines_frame,
+            bg=self.COLORS["surface_1"],
+            highlightthickness=0,
         )
-        self.liste_machines_container.pack(fill=tk.X)
+        machines_scrollbar = tk.Scrollbar(
+            machines_frame,
+            orient="vertical",
+            command=self.machines_canvas.yview,
+        )
+        self.machines_canvas.configure(yscrollcommand=machines_scrollbar.set)
+
+        self.machines_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        machines_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Conteneur redessiné à chaque actualisation (placé DANS le canvas)
+        self.liste_machines_container = tk.Frame(
+            self.machines_canvas, bg=self.COLORS["surface_1"]
+        )
+        self.machines_canvas_window = self.machines_canvas.create_window(
+            (0, 0), window=self.liste_machines_container, anchor="nw"
+        )
+
+        self.liste_machines_container.bind(
+            "<Configure>",
+            lambda e: self.machines_canvas.configure(scrollregion=self.machines_canvas.bbox("all")),
+        )
+        self.machines_canvas.bind(
+            "<Configure>",
+            lambda e: self.machines_canvas.itemconfig(self.machines_canvas_window, width=e.width),
+        )
+
+        # Molette de souris active SEULEMENT quand le curseur survole la sidebar
+        # (évite un conflit avec le scroll du tableau des événements)
+        def _on_mousewheel_sidebar(event):
+            if event.num == 5 or event.delta < 0:
+                self.machines_canvas.yview_scroll(1, "units")
+            elif event.num == 4 or event.delta > 0:
+                self.machines_canvas.yview_scroll(-1, "units")
+
+        def _bind_scroll_sidebar(event):
+            self.machines_canvas.bind_all("<MouseWheel>", _on_mousewheel_sidebar)
+            self.machines_canvas.bind_all("<Button-4>", _on_mousewheel_sidebar)
+            self.machines_canvas.bind_all("<Button-5>", _on_mousewheel_sidebar)
+
+        def _unbind_scroll_sidebar(event):
+            self.machines_canvas.unbind_all("<MouseWheel>")
+            self.machines_canvas.unbind_all("<Button-4>")
+            self.machines_canvas.unbind_all("<Button-5>")
+
+        self.machines_canvas.bind("<Enter>", _bind_scroll_sidebar)
+        self.machines_canvas.bind("<Leave>", _unbind_scroll_sidebar)
 
         self._dessiner_machines([])  # vide au démarrage
-
-        # Espace pour pousser l'intervalle en bas
-        spacer = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"], height=10)
-        spacer.pack(fill=tk.BOTH, expand=True)
 
         # Section "Intervalle" (en bas)
         interval_frame = tk.Frame(self.sidebar, bg=self.COLORS["surface_1"])
@@ -339,57 +385,24 @@ class PingMonitorDarkApp:
 
         label_chart = tk.Label(
             inner_chart,
-            text="Évolution de l'état (24h)",
+            text="Évolution récente",
             font=self.font_medium,
             fg=self.COLORS["text_primary"],
             bg=self.COLORS["surface_2"],
         )
         label_chart.pack(anchor=tk.W, pady=(0, 6))
 
-        # Canvas pour le graphique
-        canvas = tk.Canvas(
+        # Canvas pour le graphique (stocké en attribut pour être redessiné plus tard)
+        self.chart_canvas = tk.Canvas(
             inner_chart,
-            height=70,
+            height=90,
             bg=self.COLORS["surface_2"],
             highlightthickness=0,
         )
-        canvas.pack(fill=tk.X, pady=(0, 0))
+        self.chart_canvas.pack(fill=tk.X, pady=(0, 0))
 
-        # Données du graphique
-        points = [
-            (0, 40),
-            (40, 40),
-            (80, 20),
-            (120, 20),
-            (160, 20),
-            (200, 60),
-            (240, 60),
-            (280, 20),
-            (320, 20),
-            (360, 20),
-            (400, 20),
-            (440, 20),
-            (480, 45),
-            (520, 20),
-            (560, 20),
-            (600, 20),
-        ]
-
-        canvas.update_idletasks()
-        canvas_width = canvas.winfo_width() if canvas.winfo_width() > 100 else 600
-        scale_x = canvas_width / 600 if canvas_width > 0 else 1
-
-        coords = []
-        for x, y in points:
-            coords.append(x * scale_x)
-            coords.append(y)
-
-        canvas.create_line(
-            coords,
-            fill=self.COLORS["text_success"],
-            width=2,
-            smooth=False,
-        )
+        # Historique des valeurs de disponibilité (%) affichées sur le graphique
+        self.historique_dispo = []
 
         # ----- LIGNE 3 : Journal des événements (tableau dynamique) -----
         log_frame = tk.Frame(
@@ -574,13 +587,84 @@ class PingMonitorDarkApp:
         self.entry_name.insert(0, "Nom (optionnel)")
 
     
-    def mettre_a_jour_indicateurs(self, disponibilite, machines_en_ligne, total_machines, pannes, dernier_scan):
+    def mettre_a_jour_indicateurs(self, disponibilite, machines_en_ligne, total_machines, pannes, dernier_scan_ts):
         """Appelée par le contrôleur (thread principal) pour rafraîchir les 4 cartes du haut."""
         self.indicator_labels["Disponibilité globale"].config(text=f"{disponibilite:.0f}%")
         self.indicator_labels["Machines en ligne"].config(text=f"{machines_en_ligne} / {total_machines}")
         self.indicator_labels["Pannes détectées"].config(text=str(pannes))
-        self.indicator_labels["Dernier scan"].config(text=dernier_scan)
+        self.dernier_scan_ts = dernier_scan_ts  # timestamp, affiché en direct par _tick_dernier_scan
+
+    def _tick_dernier_scan(self):
+        """Rafraîchit le libellé 'Dernier scan' chaque seconde (compteur en direct)."""
+        if hasattr(self, "dernier_scan_ts"):
+            secondes = int(time.time() - self.dernier_scan_ts)
+            self.indicator_labels["Dernier scan"].config(text=f"il y a {secondes}s")
+        self.root.after(1000, self._tick_dernier_scan)  # se replanifie lui-même
         
+    def mettre_a_jour_graphique(self, valeurs):
+        """
+        Redessine le graphique d'évolution à partir d'une liste de %
+        de disponibilité, avec grille de repère et valeur actuelle affichée.
+        """
+        self.chart_canvas.delete("all")
+
+        largeur = self.chart_canvas.winfo_width() or 600
+        hauteur = 90
+        marge_gauche = 34   # espace réservé pour les labels "0% / 50% / 100%"
+        marge_haut = 8
+        marge_bas = 8
+        zone_haut = hauteur - marge_haut - marge_bas
+
+        # ----- Grille horizontale + labels de pourcentage -----
+        for pct in (0, 50, 100):
+            y = marge_haut + zone_haut - (pct / 100) * zone_haut
+            self.chart_canvas.create_line(
+                marge_gauche, y, largeur, y,
+                fill=self.COLORS["border"], width=1, dash=(2, 3),
+            )
+            self.chart_canvas.create_text(
+                marge_gauche - 6, y,
+                text=f"{pct}%",
+                fill=self.COLORS["text_muted"],
+                font=self.font_small,
+                anchor="e",
+            )
+
+        if len(valeurs) < 2:
+            self.chart_canvas.create_text(
+                (largeur + marge_gauche) / 2, hauteur / 2,
+                text="En attente de données...",
+                fill=self.COLORS["text_muted"],
+                font=self.font_small,
+            )
+            return
+
+        # ----- Tracé de la courbe -----
+        pas_x = (largeur - marge_gauche - 10) / (len(valeurs) - 1)
+        coords = []
+        for i, valeur in enumerate(valeurs):
+            x = marge_gauche + i * pas_x
+            y = marge_haut + zone_haut - (valeur / 100) * zone_haut
+            coords.extend([x, y])
+
+        derniere_valeur = valeurs[-1]
+        couleur = self.COLORS["text_success"] if derniere_valeur >= 50 else self.COLORS["text_danger"]
+
+        self.chart_canvas.create_line(coords, fill=couleur, width=2, smooth=True)
+
+        # Point + étiquette sur la dernière valeur (valeur actuelle)
+        dernier_x, dernier_y = coords[-2], coords[-1]
+        self.chart_canvas.create_oval(
+            dernier_x - 3, dernier_y - 3, dernier_x + 3, dernier_y + 3,
+            fill=couleur, outline="",
+        )
+        self.chart_canvas.create_text(
+            dernier_x, dernier_y - 12,
+            text=f"{derniere_valeur:.0f}%",
+            fill=couleur,
+            font=self.font_small,
+            anchor="s",
+        )
 
     def ajouter_evenement(self, heure, machine, evenement):
         """

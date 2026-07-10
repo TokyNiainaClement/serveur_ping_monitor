@@ -17,6 +17,7 @@ class DashboardController:
         self.db = Database()
         self.intervalle = 5  # secondes entre chaque cycle de ping
         self.derniers_statuts = {}
+        self.historique_dispo = []  # points % de disponibilité pour le graphique
 
         # 1. On construit la fenêtre (ne bloque plus, grâce à run() séparé)
         self.view = PingMonitorDarkApp(
@@ -77,10 +78,13 @@ class DashboardController:
                     self.view.root.after(0, self._mettre_a_jour_vue, heure, nom, statut)
 
             # Calcul des statistiques après un cycle complet de ping
-            disponibilite, pannes = self.db.get_stats_globales()
+            _, pannes = self.db.get_stats_globales()  # on garde juste le compteur de pannes
             machines_en_ligne = sum(1 for v in self.derniers_statuts.values() if v)
             total_machines = len(machines)
-            dernier_scan = time.strftime("%H:%M:%S")
+            dernier_scan = time.time()
+
+            # Disponibilité = état RÉEL et ACTUEL du réseau (cohérent avec le graphique)
+            disponibilite = (machines_en_ligne / total_machines * 100) if total_machines > 0 else 0
 
             self.view.root.after(
                 0,
@@ -91,6 +95,12 @@ class DashboardController:
                 pannes,
                 dernier_scan,
             )
+
+            # Nouveau point pour le graphique d'évolution (% de machines en ligne à cet instant)
+            self.historique_dispo.append(disponibilite)
+            self.historique_dispo = self.historique_dispo[-60:]  # garde les 60 derniers cycles
+
+            self.view.root.after(0, self.view.mettre_a_jour_graphique, self.historique_dispo)
 
             time.sleep(self.intervalle)
 
