@@ -2,6 +2,7 @@ import threading
 import time
 
 from views.fenetre import PingMonitorDarkApp
+from views.gestion_window import GestionWindow
 from data.database import Database
 from core.ping_service import ping
 
@@ -17,12 +18,13 @@ class DashboardController:
         self.db = Database()
         self.intervalle = 5  # secondes entre chaque cycle de ping
         self.derniers_statuts = {}
-        self.historique_dispo = []  # points % de disponibilité pour le graphique
+        self.historique_dispo = []
 
         # 1. On construit la fenêtre (ne bloque plus, grâce à run() séparé)
         self.view = PingMonitorDarkApp(
             on_ajouter=self.ajouter_machine,
             on_actualiser=self.actualiser_machines,
+            on_gerer=self.ouvrir_gestion,
         )
 
         self.actualiser_machines()  # <-- première génération de la liste
@@ -55,6 +57,28 @@ class DashboardController:
         else:
             self.view.ajouter_evenement(heure, nom, "Erreur : IP déjà existante")
 
+    def ouvrir_gestion(self):
+        """Ouvre la fenêtre de gestion des machines (Toplevel)."""
+        GestionWindow(
+            self.view.root,
+            get_machines=self.db.get_machines,
+            get_evenements=self.db.get_evenements,
+            on_modifier=self.modifier_machine,
+            on_supprimer=self.supprimer_machine,
+        )
+
+    def modifier_machine(self, id_m, nom, ip):
+        """Appelée depuis la fenêtre de gestion. Retourne True/False (succès)."""
+        succes = self.db.update_machine(id_m, nom, ip)
+        if succes:
+            self.actualiser_machines()  # rafraîchit la sidebar principale
+        return succes
+
+    def supprimer_machine(self, id_m):
+        """Appelée depuis la fenêtre de gestion."""
+        self.db.delete_machine(id_m)
+        self.actualiser_machines()  # rafraîchit la sidebar principale
+
     def _boucle_ping(self):
         """Boucle infinie : ping toutes les machines de la BDD, toutes les X secondes."""
         while True:
@@ -78,13 +102,10 @@ class DashboardController:
                     self.view.root.after(0, self._mettre_a_jour_vue, heure, nom, statut)
 
             # Calcul des statistiques après un cycle complet de ping
-            _, pannes = self.db.get_stats_globales()  # on garde juste le compteur de pannes
+            disponibilite, pannes = self.db.get_stats_globales()
             machines_en_ligne = sum(1 for v in self.derniers_statuts.values() if v)
             total_machines = len(machines)
             dernier_scan = time.time()
-
-            # Disponibilité = état RÉEL et ACTUEL du réseau (cohérent avec le graphique)
-            disponibilite = (machines_en_ligne / total_machines * 100) if total_machines > 0 else 0
 
             self.view.root.after(
                 0,

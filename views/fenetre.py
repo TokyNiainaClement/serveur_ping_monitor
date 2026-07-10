@@ -23,10 +23,11 @@ class PingMonitorDarkApp:
         "text_danger": "#E24B4A",  # Danger / Hors ligne
     }
 
-    def __init__(self, on_ajouter=None, on_actualiser=None):
+    def __init__(self, on_ajouter=None, on_actualiser=None, on_gerer=None):
         self.root = tk.Tk()
         self.on_ajouter = on_ajouter
         self.on_actualiser = on_actualiser
+        self.on_gerer = on_gerer
         self.root.title("Ping Monitor")
         self.root.geometry("1100x680")
         self.root.configure(bg=self.COLORS["body_bg"])
@@ -104,7 +105,8 @@ class PingMonitorDarkApp:
             highlightthickness=0,
             cursor="hand2",
             activebackground=self.COLORS["border"],
-            activeforeground=self.COLORS["text_primary"]
+            activeforeground=self.COLORS["text_primary"],
+            command=self._on_clic_gerer
         )
         btn_manage.pack(side=tk.LEFT, padx=16, pady=10)
 
@@ -566,6 +568,10 @@ class PingMonitorDarkApp:
     def _on_clic_actualiser(self):
         if self.on_actualiser:
             self.on_actualiser()
+    
+    def _on_clic_gerer(self):
+        if self.on_gerer:
+            self.on_gerer()
 
     def _on_clic_ajouter(self):
         """Lit les champs IP/Nom et transmet au contrôleur via le callback."""
@@ -608,7 +614,11 @@ class PingMonitorDarkApp:
         """
         self.chart_canvas.delete("all")
 
-        largeur = self.chart_canvas.winfo_width() or 600
+        self.chart_canvas.update_idletasks()
+        largeur = self.chart_canvas.winfo_width()
+        if largeur <= 1:
+            largeur = 600
+            
         hauteur = 90
         marge_gauche = 34   # espace réservé pour les labels "0% / 50% / 100%"
         marge_haut = 8
