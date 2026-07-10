@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 
 class GestionWindow(tk.Toplevel):
@@ -24,7 +24,7 @@ class GestionWindow(tk.Toplevel):
         "text_danger": "#E24B4A",
     }
 
-    def __init__(self, master, get_machines, get_evenements, on_modifier, on_supprimer):
+    def __init__(self, master, get_machines, get_evenements, on_modifier, on_supprimer, on_effacer_historique):
         """
         get_machines()             -> [(id, nom, ip), ...]
         get_evenements(ip=None)    -> [(id, heure, ip, nom, evenement), ...]
@@ -36,6 +36,8 @@ class GestionWindow(tk.Toplevel):
         self.get_evenements = get_evenements
         self.on_modifier = on_modifier
         self.on_supprimer = on_supprimer
+        self.on_effacer_historique = on_effacer_historique
+        self.ip_filtre_historique = None  # None = historique global, sinon IP de la machine sélectionnée
 
         self.title("Gestion des machines")
         self.geometry("700x600")
@@ -202,15 +204,22 @@ class GestionWindow(tk.Toplevel):
         self.label_message.grid(row=2, column=0, columnspan=4, sticky="w", pady=(6, 0))
 
         # ----- Section : historique -----
-        label_histo = tk.Label(
-            main,
-            text="Historique des événements (toutes machines)",
-            font=self.font_medium,
-            fg=self.COLORS["text_primary"],
-            bg=self.COLORS["body_bg"],
+        header_histo = tk.Frame(main, bg=self.COLORS["body_bg"])
+        header_histo.pack(fill=tk.X, pady=(0, 6))
+
+        self.label_histo = tk.Label(
+            header_histo, text="Historique des événements (toutes machines)",
+            font=self.font_medium, fg=self.COLORS["text_primary"], bg=self.COLORS["body_bg"],
         )
-        self.label_histo = label_histo
-        label_histo.pack(anchor=tk.W, pady=(0, 6))
+        self.label_histo.pack(side=tk.LEFT, anchor=tk.W)
+
+        self.btn_effacer_historique = tk.Button(
+            header_histo, text="🗑️ Vider l'historique affiché", font=self.font_small,
+            bg=self.COLORS["surface_1"], fg=self.COLORS["text_danger"], relief="flat", bd=1,
+            cursor="hand2", activebackground=self.COLORS["border"],
+            command=self._on_clic_effacer_historique,
+        )
+        self.btn_effacer_historique.pack(side=tk.RIGHT)
 
         self.tree_historique = ttk.Treeview(
             main,
@@ -276,6 +285,7 @@ class GestionWindow(tk.Toplevel):
         nom, ip = self.tree_machines.item(selection[0], "values")
 
         self.machine_selectionnee = id_m
+        self.ip_filtre_historique = ip
         self.entry_nom.delete(0, tk.END)
         self.entry_nom.insert(0, nom)
         self.entry_ip.delete(0, tk.END)
@@ -311,6 +321,20 @@ class GestionWindow(tk.Toplevel):
                 text="Erreur : cette adresse IP est déjà utilisée par une autre machine.",
                 fg=self.COLORS["text_danger"],
             )
+
+    
+    def _on_clic_effacer_historique(self):
+        cible = f"de « {self.entry_nom.get()} »" if self.ip_filtre_historique else "de TOUTES les machines"
+        confirme = messagebox.askyesno(
+            "Confirmer la suppression",
+            f"Voulez-vous vraiment supprimer l'historique {cible} ?\nCette action est irréversible.",
+            parent=self,
+        )
+        if not confirme:
+            return
+        self.on_effacer_historique(self.ip_filtre_historique)
+        self._charger_historique(ip=self.ip_filtre_historique)
+        
 
     def _on_clic_supprimer(self):
         if self.machine_selectionnee is None:

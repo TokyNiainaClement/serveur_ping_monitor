@@ -95,6 +95,14 @@ class Database:
         self.cursor.execute("DELETE FROM machines WHERE id = ?", (id_m,))
         self.conn.commit()
 
+    def effacer_historique(self, ip=None):
+        """Supprime l'historique des événements (tout, ou uniquement pour une machine)."""
+        if ip:
+            self.cursor.execute("DELETE FROM evenements WHERE ip = ?", (ip,))
+        else:
+            self.cursor.execute("DELETE FROM evenements")
+        self.conn.commit()
+
     def get_stats_globales(self):
         """Calcule la disponibilité (%) et le nombre de pannes sur tout l'historique."""
         self.cursor.execute(

@@ -65,7 +65,12 @@ class DashboardController:
             get_evenements=self.db.get_evenements,
             on_modifier=self.modifier_machine,
             on_supprimer=self.supprimer_machine,
+            on_effacer_historique=self.effacer_historique,
         )
+
+    def effacer_historique(self, ip=None):
+        """Appelée depuis la fenêtre de gestion pour vider l'historique (tout ou une machine)."""
+        self.db.effacer_historique(ip=ip)
 
     def modifier_machine(self, id_m, nom, ip):
         """Appelée depuis la fenêtre de gestion. Retourne True/False (succès)."""
